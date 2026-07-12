@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux Studio — constraint-based metabolic modelling in your browser</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="fba/studio.css">
+<script>
+  /* set the theme before first paint, so there is no flash of the wrong one */
+  (function () {
+    var t = null;
+    try { t = localStorage.getItem('studio-theme'); } catch (e) {}
+    document.documentElement.setAttribute('data-theme', (t === 'light' || t === 'dark') ? t : 'dark');
+  })();
+</script>
+</head>
+<body>
+
+<div class="studio-layout">
+  <aside class="sidebar" id="sidebar">
+    <a class="sidebar-brand" href="https://omidard.github.io/panGEMs/" title="Browse the 4,659 models">
+      <span class="brand-mark"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6M10 3v6.4L5.3 18a2 2 0 0 0 1.7 3h10a2 2 0 0 0 1.7-3L14 9.4V3"/><path d="M7.6 15h8.8"/></svg></span>
+      <span class="brand-txt"><b>Flux Studio</b><small>← 4,659 models</small></span>
+    </a>
+    <nav class="sidebar-nav" id="studio-nav">
+      <button class="nav-item active" data-tab="home"><span class="ni"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.2 9.4V20a1 1 0 0 0 1 1H10v-6h4v6h3.8a1 1 0 0 0 1-1V9.4"/></svg></span> Home</button>
+      <div class="nav-group">Simulate</div>
+      <button class="nav-item" data-tab="explore"><span class="ni"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6M10 3v6.4L5.3 18a2 2 0 0 0 1.7 3h10a2 2 0 0 0 1.7-3L14 9.4V3"/><path d="M7.6 15h8.8"/></svg></span> Explore &amp; Compare</button>
+      <button class="nav-item" data-tab="dfba"><span class="ni"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5.2l3.4 2"/></svg></span> Dynamic FBA</button>
+      <div class="nav-group">Explore the solution space</div>
+      <button class="nav-item" data-tab="sampling"><span class="ni"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21V3M3 21h18"/><circle cx="7" cy="8" r="1.3"/><circle cx="11" cy="13" r="1.3"/><circle cx="16" cy="7" r="1.3"/><circle cx="9" cy="17" r="1.3"/><circle cx="16" cy="15" r="1.3"/><circle cx="19" cy="11" r="1.3"/></svg></span> Flux Sampling</button>
+      <button class="nav-item" data-tab="fva"><span class="ni"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18"/><path d="M6.5 18v-8M12 18V4M17.5 18v-5"/></svg></span> Flux Variability</button>
+      <button class="nav-item" data-tab="envelope"><span class="ni"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17.5 9.5 11l4 4L21 7.5"/><path d="M15.2 7.5H21v5.8"/></svg></span> Production Envelope</button>
+      <button class="nav-item" data-tab="phaseplane"><span class="ni"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="1.5"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg></span> Phenotype Phase Plane</button>
+      <div class="nav-group">Screen &amp; design</div>
+      <button class="nav-item" data-tab="genes"><span class="ni"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3c0 5 10 5 10 9s-10 4-10 9"/><path d="M17 3c0 5-10 5-10 9s10 4 10 9"/><path d="M8.5 6.5h7M8 17.5h8M7.6 9.5h8.8M7.6 14.5h8.8"/></svg></span> Gene Essentiality</button>
+      <button class="nav-item" data-tab="synlethal"><span class="ni"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 14.5 14.5 9.5"/><path d="M11 6.5 12.6 5a4.3 4.3 0 0 1 6.1 6.1L17 12.8"/><path d="M13 17.5 11.4 19a4.3 4.3 0 0 1-6.1-6.1L7 11.2"/></svg></span> Synthetic Lethality</button>
+      <button class="nav-item" data-tab="design"><span class="ni"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 6.5a4.5 4.5 0 0 0 5.7 5.7l-8 8a2.5 2.5 0 0 1-3.5-3.5l8-8a4.5 4.5 0 0 0-2.2-2.2Z"/></svg></span> Strain Design (FSEOF)</button>
+      <button class="nav-item" data-tab="essential"><span class="ni"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.2"/><circle cx="12" cy="12" r="3.8"/><circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none"/></svg></span> Essentiality Screen</button>
+      <div class="nav-group">Populations</div>
+      <button class="nav-item" data-tab="multi"><span class="ni"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3.2 12h17.6"/><path d="M12 3a13.5 13.5 0 0 1 0 18 13.5 13.5 0 0 1 0-18Z"/></svg></span> Multi-model</button>
+      <button class="nav-item" data-tab="cohort"><span class="ni"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5v17"/><path d="M5.5 7.2h13"/><path d="M7 7.2 4 14h6L7 7.2Z"/><path d="M17 7.2 14 14h6l-3-6.8Z"/><path d="M8.5 20.5h7"/></svg></span> Group comparison</button>
+      <div class="nav-group">Model quality</div>
+      <button class="nav-item" data-tab="qc"><span class="ni"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 5 6v5.5c0 4.3 2.9 8.2 7 9.5 4.1-1.3 7-5.2 7-9.5V6l-7-3Z"/><path d="m9 12 2 2 4-4"/></svg></span> Model QC</button>
+    </nav>
+    <div class="sidebar-foot">100% in-browser<br>glpk.js · Escher · Plotly</div>
+  </aside>
+
+  <main class="studio-main">
+    <div class="topbar">
+      <button class="menu-toggle" id="menu-toggle" aria-label="Open navigation"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <div><h1 id="page-title">Flux Analysis Studio</h1>
+      <p id="page-sub">A constraint-based modelling workbench for 4,659 strain-specific metabolic models — everything runs in your browser.</p></div>
+      <button class="studio-theme" id="studio-theme" type="button" aria-label="Switch to light theme" aria-pressed="false">
+        <svg class="i-moon" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+        <svg class="i-sun" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.4M12 19.6V22M2 12h2.4M19.6 12H22M4.9 4.9l1.7 1.7M17.4 17.4l1.7 1.7M19.1 4.9l-1.7 1.7M6.6 17.4l-1.7 1.7"/></svg>
+      </button>
+    </div>
+
+  <!-- ── HOME / tool gallery ───────────────────────────────────────────────── -->
+  <div class="studio-panel active" id="panel-home">
+    <div class="home-hero">
+      <h2>Pick a tool. Everything runs locally — no server, no waiting queue.</h2>
+      <p>Genome-scale metabolic models for every strain, solved live in your browser with a WebAssembly LP solver. Choose an analysis below.</p>
+    </div>
+    <div class="tool-gallery" id="tool-gallery">
+      <button class="tool-card" data-tab="explore"><span class="tc-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6M10 3v6.4L5.3 18a2 2 0 0 0 1.7 3h10a2 2 0 0 0 1.7-3L14 9.4V3"/><path d="M7.6 15h8.8"/></svg></span><b>Explore &amp; Compare</b><span>FBA / pFBA with editable media, knockouts &amp; a live Escher flux map. Compare two conditions side by side.</span></button>
+      <button class="tool-card" data-tab="dfba"><span class="tc-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5.2l3.4 2"/></svg></span><b>Dynamic FBA</b><span>Batch-culture time course — biomass growth, substrate depletion &amp; product accumulation.</span></button>
+      <button class="tool-card" data-tab="fva"><span class="tc-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18"/><path d="M6.5 18v-8M12 18V4M17.5 18v-5"/></svg></span><b>Flux Variability</b><span>Min/max flux of every exchange at a chosen fraction of optimal growth.</span></button>
+      <button class="tool-card" data-tab="envelope"><span class="tc-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17.5 9.5 11l4 4L21 7.5"/><path d="M15.2 7.5H21v5.8"/></svg></span><b>Production Envelope</b><span>The growth-vs-product trade-off for any secreted metabolite — the bioengineer's map.</span></button>
+      <button class="tool-card" data-tab="phaseplane"><span class="tc-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="1.5"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg></span><b>Phenotype Phase Plane</b><span>Growth surface over two uptake rates — the classic 2-D phenotype landscape.</span></button>
+      <button class="tool-card" data-tab="essential"><span class="tc-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.2"/><circle cx="12" cy="12" r="3.8"/><circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none"/></svg></span><b>Essentiality Screen</b><span>Single-reaction knockout scan — find the essential, redundant &amp; dispensable reactions.</span></button>
+      <button class="tool-card" data-tab="multi"><span class="tc-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3.2 12h17.6"/><path d="M12 3a13.5 13.5 0 0 1 0 18 13.5 13.5 0 0 1 0-18Z"/></svg></span><b>Multi-model analytics</b><span>Run FBA across many strains — growth, flux scatter, PCA &amp; heatmap, all clickable.</span></button>
+      <button class="tool-card" data-tab="cohort"><span class="tc-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5v17"/><path d="M5.5 7.2h13"/><path d="M7 7.2 4 14h6L7 7.2Z"/><path d="M17 7.2 14 14h6l-3-6.8Z"/><path d="M8.5 20.5h7"/></svg></span><b>Group comparison</b><span>Define groups by metadata &amp; test which metabolic traits differ — with real statistics.</span></button>
+      <button class="tool-card" data-tab="genes"><span class="tc-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3c0 5 10 5 10 9s-10 4-10 9"/><path d="M17 3c0 5-10 5-10 9s10 4 10 9"/><path d="M8.5 6.5h7M8 17.5h8M7.6 9.5h8.8M7.6 14.5h8.8"/></svg></span><b>Gene Essentiality</b><span>Delete each gene through its GPR: an isozyme survives, a complex does not. The gene-level essentiality map.</span></button>
+      <button class="tool-card" data-tab="synlethal"><span class="tc-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 14.5 14.5 9.5"/><path d="M11 6.5 12.6 5a4.3 4.3 0 0 1 6.1 6.1L17 12.8"/><path d="M13 17.5 11.4 19a4.3 4.3 0 0 1-6.1-6.1L7 11.2"/></svg></span><b>Synthetic Lethality</b><span>Double deletions &mdash; pairs where neither knockout hurts alone, but together they kill.</span></button>
+      <button class="tool-card" data-tab="design"><span class="tc-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 6.5a4.5 4.5 0 0 0 5.7 5.7l-8 8a2.5 2.5 0 0 1-3.5-3.5l8-8a4.5 4.5 0 0 0-2.2-2.2Z"/></svg></span><b>Strain Design (FSEOF)</b><span>Force a product up and see which reactions must carry more flux: the over-expression targets.</span></button>
+      <button class="tool-card" data-tab="sampling"><span class="tc-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21V3M3 21h18"/><circle cx="7" cy="8" r="1.3"/><circle cx="11" cy="13" r="1.3"/><circle cx="16" cy="7" r="1.3"/><circle cx="9" cy="17" r="1.3"/><circle cx="16" cy="15" r="1.3"/><circle cx="19" cy="11" r="1.3"/></svg></span><b>Flux Sampling</b><span>ACHR hit-and-run through the solution space. Not one optimum, but the whole distribution.</span></button>
+      <button class="tool-card" data-tab="qc"><span class="tc-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 5 6v5.5c0 4.3 2.9 8.2 7 9.5 4.1-1.3 7-5.2 7-9.5V6l-7-3Z"/><path d="m9 12 2 2 4-4"/></svg></span><b>Model QC</b><span>Blocked reactions, mass and charge imbalance, dead-end metabolites, orphan genes.</span></button>
+    </div>
+    <p class="home-note">All results and plots are downloadable. Verified against COBRApy &amp; scipy.</p>
+  </div>
+
+  <!-- ── EXPLORE (single / compare) ────────────────────────────────────────── -->
+  <div class="studio-panel" id="panel-explore">
+    <div class="studio-card">
+      <h2>Explore &amp; Compare</h2>
+      <p class="fba-sub">Pick a strain model and a growth medium, then solve FBA or pFBA. Switch to <strong>Compare A vs B</strong> to contrast two models, two media, or the effect of a knockout. Media from Ardalani <em>et al.</em> (PLOS Pathogens, ppat.1013775).</p>
+      <div class="fba-modebar">
+        <div class="fba-modetoggle" id="fba-modetoggle">
+          <button type="button" data-mode="single" class="active">Single analysis</button>
+          <button type="button" data-mode="compare">Compare A vs B</button>
+          <button type="button" data-mode="ko">Knockout study</button>
+        </div>
+        <div class="fba-method"><span class="fba-method-lbl">Method:</span>
+          <label><input type="radio" name="fba-method" value="fba"> FBA</label>
+          <label><input type="radio" name="fba-method" value="pfba" checked> pFBA</label>
+          <label id="fba-moma-opt" style="display:none" title="Minimisation of Metabolic Adjustment: after a knockout the cell stays as close to its old flux state as it can, rather than re-optimising growth. Linear form (COBRApy moma(linear=True)); the quadratic form needs a QP solver."><input type="radio" name="fba-method" value="moma"> MOMA</label>
+          <label class="fba-loopless" title="CycleFreeFlux: remove thermodynamically infeasible internal loops while holding growth and every exchange flux fixed."><input type="checkbox" id="fba-loopless"> loopless</label>
+        </div>
+        <button class="btn btn-primary btn-sm" id="fba-run" style="min-width:130px">▶ Run analysis</button>
+      </div>
+      <div class="fba-note" id="fba-ko-hint" style="display:none;margin-bottom:0.9rem">
+        <b>Knockout study.</b> Pick a model and a medium, then add the reactions to remove. The studio solves the
+        same model twice, with and without them, and reports the difference: growth before and after, an essentiality
+        verdict, every re-routed reaction, and two flux maps side by side.
+      </div>
+      <div class="fba-conditions" id="fba-conditions"></div>
+      <div class="fba-status" id="fba-status"></div>
+      <div id="fba-results" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- ── FVA ───────────────────────────────────────────────────────────────── -->
+  <div class="studio-panel" id="panel-fva">
+    <div class="studio-card">
+      <h2>Flux Variability Analysis</h2>
+      <p class="studio-sub">Compute the minimum and maximum possible flux of each exchange reaction while biomass stays at a chosen fraction of its optimum — revealing which secretions are obligatory vs optional.</p>
+      <div class="studio-controls">
+        <div>
+          <label class="fld">Strain model</label>
+          <div class="fba-combo"><input class="form-control form-control-sm fba-combo-input" id="fva-model-input" placeholder="Search genome name, strain or ID…" autocomplete="off"><div class="fba-combo-menu" id="fva-model-menu"></div></div>
+          <div class="fba-modelcard" id="fva-modelcard" style="display:none"></div>
+        </div>
+        <div>
+          <label class="fld">Growth medium</label>
+          <select class="form-select form-select-sm" id="fva-media"></select>
+          <div class="fba-media-desc" id="fva-media-desc"></div>
+          <div class="studio-param" style="margin-top:0.5rem"><label>Biomass fraction of optimum</label>
+            <input type="range" id="fva-frac" min="0" max="1" step="0.05" value="0.9" style="width:150px"> <span id="fva-frac-val">0.90</span></div>
+        </div>
+        <div><label class="fld">&nbsp;</label><button class="btn btn-primary btn-sm" id="fva-run" style="min-width:120px">▶ Run FVA</button></div>
+      </div>
+      <div class="studio-progress" id="fva-prog"><div class="studio-progress-bar" id="fva-prog-bar"></div></div>
+      <div class="fba-status" id="fva-status"></div>
+      <div id="fva-results" style="display:none">
+        <div id="fva-plot" class="plot-tall"></div>
+        <div id="fva-table" style="margin-top:1rem"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Dynamic FBA ───────────────────────────────────────────────────────── -->
+  <div class="studio-panel" id="panel-dfba">
+    <div class="studio-card">
+      <h2>Dynamic FBA (batch culture)</h2>
+      <p class="studio-sub">Simulate a batch fermentation over time: substrate uptake follows Michaelis–Menten kinetics, biomass and metabolite concentrations integrate step by step (static-optimization dFBA). Watch growth, substrate depletion and product accumulation.</p>
+      <div class="studio-controls">
+        <div>
+          <label class="fld">Strain model</label>
+          <div class="fba-combo"><input class="form-control form-control-sm fba-combo-input" id="dfba-model-input" placeholder="Search genome name, strain or ID…" autocomplete="off"><div class="fba-combo-menu" id="dfba-model-menu"></div></div>
+          <div class="fba-modelcard" id="dfba-modelcard" style="display:none"></div>
+        </div>
+        <div>
+          <label class="fld">Background medium</label>
+          <select class="form-select form-select-sm" id="dfba-media"></select>
+          <label class="fld" style="margin-top:0.5rem">Limiting substrate</label>
+          <select class="form-select form-select-sm" id="dfba-substrate"><option value="EX_glc__D_e">Glucose (EX_glc__D_e)</option></select>
+        </div>
+        <div><label class="fld">&nbsp;</label><button class="btn btn-primary btn-sm" id="dfba-run" style="min-width:120px">▶ Run dFBA</button></div>
+      </div>
+      <div style="margin-top:0.6rem">
+        <div class="studio-param"><label>Substrate S₀ (mM)</label><input type="number" id="dfba-s0" value="10" step="1" class="form-control form-control-sm"></div>
+        <div class="studio-param"><label>Biomass X₀ (gDW/L)</label><input type="number" id="dfba-x0" value="0.01" step="0.01" class="form-control form-control-sm"></div>
+        <div class="studio-param"><label>Vmax (mmol/gDW/h)</label><input type="number" id="dfba-vmax" value="10" step="1" class="form-control form-control-sm"></div>
+        <div class="studio-param"><label>Km (mM)</label><input type="number" id="dfba-km" value="0.5" step="0.1" class="form-control form-control-sm"></div>
+        <div class="studio-param"><label>Δt (h)</label><input type="number" id="dfba-dt" value="0.25" step="0.05" class="form-control form-control-sm"></div>
+        <div class="studio-param"><label>t max (h)</label><input type="number" id="dfba-tmax" value="14" step="1" class="form-control form-control-sm"></div>
+      </div>
+      <div class="studio-progress" id="dfba-prog"><div class="studio-progress-bar" id="dfba-prog-bar"></div></div>
+      <div class="fba-status" id="dfba-status"></div>
+      <div id="dfba-results" style="display:none">
+        <div id="dfba-plot" class="plot-tall"></div>
+        <div id="dfba-note" class="fba-map-note"></div>
+        <button class="btn btn-sm btn-outline-secondary mt-2" id="dfba-csv">⬇ Download time course (CSV)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Multi-model ───────────────────────────────────────────────────────── -->
+  <div class="studio-panel" id="panel-multi">
+    <div class="studio-card">
+      <h2>Multi-model analytics</h2>
+      <p class="studio-sub">Run FBA across many strains on one medium, then explore the flux landscape: growth by phylogroup, interactive flux scatter, a PCA of exchange-flux profiles, and a heatmap. Click any point to inspect that strain.</p>
+      <div class="studio-controls">
+        <div>
+          <label class="fld">Add strain models</label>
+          <div class="fba-combo"><input class="form-control form-control-sm fba-combo-input" id="mm-model-input" placeholder="Search and add models…" autocomplete="off"><div class="fba-combo-menu" id="mm-model-menu"></div></div>
+          <div class="mm-quick" style="margin-top:5px">
+            <button class="btn btn-outline-secondary btn-sm" data-add="10">+10 random</button>
+            <button class="btn btn-outline-secondary btn-sm" data-add="25">+25 random</button>
+            <button class="btn btn-outline-secondary btn-sm" data-add="perphylo">+ diverse (per phylogroup)</button>
+            <button class="btn btn-outline-danger btn-sm" id="mm-clear">clear</button>
+          </div>
+          <div class="mm-count" id="mm-count" style="margin-top:5px">0 models selected</div>
+          <div class="mm-chips" id="mm-chips"></div>
+        </div>
+        <div>
+          <label class="fld">Growth medium</label>
+          <select class="form-select form-select-sm" id="mm-media"></select>
+          <div class="fba-media-desc" id="mm-media-desc"></div>
+          <label class="fld" style="margin-top:0.5rem">Method</label>
+          <div class="fba-method"><label><input type="radio" name="mm-method" value="fba" checked> FBA</label>
+            <label><input type="radio" name="mm-method" value="pfba"> pFBA</label></div>
+        </div>
+        <div><label class="fld">&nbsp;</label><button class="btn btn-primary btn-sm" id="mm-run" style="min-width:120px">▶ Run all</button></div>
+      </div>
+      <div class="studio-progress" id="mm-prog"><div class="studio-progress-bar" id="mm-prog-bar"></div></div>
+      <div class="fba-status" id="mm-status"></div>
+      <div id="mm-results" style="display:none">
+        <div class="fba-kpis" id="mm-kpis"></div>
+        <div class="studio-grid2">
+          <div class="fba-chart-card"><h6>Growth rate by phylogroup</h6><div id="mm-plot-growth" class="plot"></div></div>
+          <div class="fba-chart-card"><h6>Flux scatter (pick axes · click a point)</h6>
+            <div style="display:flex;gap:0.5rem;margin-bottom:0.4rem;flex-wrap:wrap">
+              <select class="form-select form-select-sm" id="mm-x" style="max-width:230px"></select>
+              <span style="align-self:center">vs</span>
+              <select class="form-select form-select-sm" id="mm-y" style="max-width:230px"></select>
+            </div>
+            <div id="mm-plot-scatter" class="plot"></div></div>
+          <div class="fba-chart-card"><h6>PCA of exchange-flux profiles (click a point)</h6><div id="mm-plot-pca" class="plot"></div></div>
+          <div class="fba-chart-card"><h6>Exchange-flux heatmap (most variable)</h6><div id="mm-plot-heat" class="plot"></div></div>
+        </div>
+        <div id="mm-detail" style="margin-top:0.6rem"></div>
+        <button class="btn btn-sm btn-outline-secondary mt-2" id="mm-csv">⬇ Download growth + exchange fluxes (CSV)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Cohort comparison ─────────────────────────────────────────────────── -->
+  <div class="studio-panel" id="panel-cohort">
+    <div class="studio-card">
+      <h2>Group comparison</h2>
+      <p class="studio-sub">Define two groups of strains by metadata — phylogroup, MLST, pathotype, isolation source, host… — then run FBA across each and test which metabolic capabilities differ. Growth is compared with a Mann–Whitney U test; per-exchange flux differences are shown as a volcano plot with Benjamini–Hochberg FDR.</p>
+      <div class="cohort-builders">
+        <div class="cohort-build" data-cohort="a">
+          <div class="cohort-head"><span class="cohort-badge">A</span> <span class="ttl">Group A</span> <span class="cohort-count" id="cohort-a-count">0 GEMs</span></div>
+          <label class="fld">Group by</label>
+          <select class="form-select form-select-sm cohort-field"></select>
+          <input class="form-control form-control-sm cohort-valsearch" placeholder="filter values…" style="margin-top:5px">
+          <div class="cohort-values"></div>
+        </div>
+        <div class="cohort-build" data-cohort="b">
+          <div class="cohort-head"><span class="cohort-badge" style="background:#c0392b">B</span> <span class="ttl">Group B</span> <span class="cohort-count" id="cohort-b-count">0 GEMs</span></div>
+          <label class="fld"><input type="checkbox" id="cohort-b-complement"> B = all other GEMs (complement of A)</label>
+          <div id="cohort-b-manual">
+            <label class="fld">Group by</label>
+            <select class="form-select form-select-sm cohort-field"></select>
+            <input class="form-control form-control-sm cohort-valsearch" placeholder="filter values…" style="margin-top:5px">
+            <div class="cohort-values"></div>
+          </div>
+        </div>
+      </div>
+      <div class="cohort-run-row">
+        <div><label class="fld">Growth medium</label><select class="form-select form-select-sm" id="cohort-media"></select></div>
+        <div><label class="fld">Method</label><div class="fba-method"><label><input type="radio" name="cohort-method" value="fba" checked> FBA</label><label><input type="radio" name="cohort-method" value="pfba"> pFBA</label></div></div>
+        <div><label class="fld">Max models / cohort <span class="fba-hint-inline">(random sample if larger)</span></label><input type="number" id="cohort-cap" value="25" min="3" max="80" class="form-control form-control-sm" style="width:90px"></div>
+        <div><label class="fld">&nbsp;</label><button class="btn btn-primary btn-sm" id="cohort-run" style="min-width:130px">▶ Compare cohorts</button></div>
+      </div>
+      <div class="studio-progress" id="cohort-prog"><div class="studio-progress-bar" id="cohort-prog-bar"></div></div>
+      <div class="fba-status" id="cohort-status"></div>
+      <div id="cohort-results" style="display:none">
+        <div class="fba-kpis" id="cohort-kpis"></div>
+        <div class="studio-grid2">
+          <div class="fba-chart-card"><h6>Growth rate: Group A vs B</h6><div id="cohort-plot-growth" class="plot"></div></div>
+          <div class="fba-chart-card"><h6>Differential exchange fluxes (volcano · click a point)</h6><div id="cohort-plot-volcano" class="plot"></div></div>
+          <div class="fba-chart-card"><h6>PCA of flux profiles (by cohort)</h6><div id="cohort-plot-pca" class="plot"></div></div>
+          <div class="fba-chart-card"><h6>Top differential exchanges (mean flux)</h6><div id="cohort-plot-bars" class="plot"></div></div>
+        </div>
+        <div id="cohort-detail" style="margin-top:0.5rem"></div>
+        <div id="cohort-table" style="margin-top:0.8rem"></div>
+        <button class="btn btn-sm btn-outline-secondary mt-2" id="cohort-csv">⬇ Download differential-flux table (CSV)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Production Envelope ────────────────────────────────────────────────── -->
+  <div class="studio-panel" id="panel-envelope">
+    <div class="studio-card">
+      <h2>Production Envelope</h2>
+      <p class="studio-sub">The trade-off between biomass and a target product: for each production level, the maximum (and minimum) growth the network allows. The frontier is the bioengineer's design space.</p>
+      <div class="studio-controls">
+        <div><label class="fld">Strain model</label><div class="fba-combo"><input class="form-control form-control-sm fba-combo-input" id="env-model-input" placeholder="Search genome name, strain or ID…" autocomplete="off"><div class="fba-combo-menu" id="env-model-menu"></div></div><div class="fba-modelcard" id="env-modelcard" style="display:none"></div></div>
+        <div><label class="fld">Growth medium</label><select class="form-select form-select-sm" id="env-media"></select>
+          <label class="fld" style="margin-top:0.5rem">Target product</label><select class="form-select form-select-sm" id="env-product"></select></div>
+        <div><label class="fld">&nbsp;</label><button class="btn btn-primary btn-sm" id="env-run" style="min-width:120px">▶ Run envelope</button></div>
+      </div>
+      <div class="studio-progress" id="env-prog"><div class="studio-progress-bar" id="env-prog-bar"></div></div>
+      <div class="fba-status" id="env-status"></div>
+      <div id="env-results" style="display:none">
+        <div class="viz"><div class="viz-head"><span>Growth vs production envelope</span><button class="viz-dl" data-plot="env-plot" data-type="plotly">⬇ PNG</button></div><div id="env-plot" class="plot-tall"></div></div>
+        <div id="env-note" class="fba-map-note"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Phenotype Phase Plane ──────────────────────────────────────────────── -->
+  <div class="studio-panel" id="panel-phaseplane">
+    <div class="studio-card">
+      <h2>Phenotype Phase Plane</h2>
+      <p class="studio-sub">Maximum growth rate across a grid of two uptake capacities — the classic Edwards–Palsson phenotype landscape. The surface reveals distinct metabolic regimes and their boundaries.</p>
+      <div class="studio-controls">
+        <div><label class="fld">Strain model</label><div class="fba-combo"><input class="form-control form-control-sm fba-combo-input" id="pp-model-input" placeholder="Search genome name, strain or ID…" autocomplete="off"><div class="fba-combo-menu" id="pp-model-menu"></div></div><div class="fba-modelcard" id="pp-modelcard" style="display:none"></div></div>
+        <div><label class="fld">Growth medium</label><select class="form-select form-select-sm" id="pp-media"></select>
+          <div style="display:flex;gap:0.5rem;margin-top:0.5rem"><div style="flex:1"><label class="fld">Axis X (uptake)</label><select class="form-select form-select-sm" id="pp-x"></select></div><div style="flex:1"><label class="fld">Axis Y (uptake)</label><select class="form-select form-select-sm" id="pp-y"></select></div></div></div>
+        <div><label class="fld">Grid</label><input type="number" id="pp-n" value="20" min="6" max="40" class="form-control form-control-sm" style="width:80px"><button class="btn btn-primary btn-sm mt-2" id="pp-run" style="min-width:120px">▶ Run plane</button></div>
+      </div>
+      <div class="studio-progress" id="pp-prog"><div class="studio-progress-bar" id="pp-prog-bar"></div></div>
+      <div class="fba-status" id="pp-status"></div>
+      <div id="pp-results" style="display:none">
+        <div class="viz"><div class="viz-head"><span>Growth-rate surface (h⁻¹)</span><button class="viz-dl" data-plot="pp-plot" data-type="plotly">⬇ PNG</button></div><div id="pp-plot" class="plot-tall"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Essentiality Screen ────────────────────────────────────────────────── -->
+  <div class="studio-panel" id="panel-essential">
+    <div class="studio-card">
+      <h2>Essentiality Screen</h2>
+      <p class="studio-sub">Knock out each reaction one at a time and measure the growth impact — mapping the essential, redundant and dispensable reactions of a strain on a given medium.</p>
+      <div class="studio-controls">
+        <div><label class="fld">Strain model</label><div class="fba-combo"><input class="form-control form-control-sm fba-combo-input" id="ess-model-input" placeholder="Search genome name, strain or ID…" autocomplete="off"><div class="fba-combo-menu" id="ess-model-menu"></div></div><div class="fba-modelcard" id="ess-modelcard" style="display:none"></div></div>
+        <div><label class="fld">Growth medium</label><select class="form-select form-select-sm" id="ess-media"></select>
+          <label class="fld" style="margin-top:0.5rem">Reaction scope</label><select class="form-select form-select-sm" id="ess-scope">
+            <option value="metabolic">Metabolic reactions (no exchange)</option>
+            <option value="all">All reactions</option>
+            <option value="exchange">Exchange reactions only</option></select></div>
+        <div><label class="fld">&nbsp;</label><button class="btn btn-primary btn-sm" id="ess-run" style="min-width:120px">▶ Run screen</button></div>
+      </div>
+      <div class="studio-progress" id="ess-prog"><div class="studio-progress-bar" id="ess-prog-bar"></div></div>
+      <div class="fba-status" id="ess-status"></div>
+      <div id="ess-results" style="display:none">
+        <div class="fba-kpis" id="ess-kpis"></div>
+        <div class="studio-grid2">
+          <div class="viz"><div class="viz-head"><span>Reaction essentiality classes</span><button class="viz-dl" data-plot="ess-plot-pie" data-type="plotly">⬇ PNG</button></div><div id="ess-plot-pie" class="plot"></div></div>
+          <div class="viz"><div class="viz-head"><span>Growth-ratio distribution</span><button class="viz-dl" data-plot="ess-plot-hist" data-type="plotly">⬇ PNG</button></div><div id="ess-plot-hist" class="plot"></div></div>
+        </div>
+        <div id="ess-table" style="margin-top:0.8rem"></div>
+        <button class="btn btn-sm btn-outline-secondary mt-2" id="ess-csv">⬇ Download essentiality table (CSV)</button>
+      </div>
+    </div>
+  </div>
+  
+  <div class="studio-panel" id="panel-genes">
+    <div class="studio-card">
+      <h2>Gene Essentiality</h2>
+      <p class="studio-sub">Delete every gene, one at a time, <b>through its GPR rule</b>. That is not the same as deleting a reaction: an isozyme (<code>a or b</code>) survives losing one gene, a complex (<code>a and b</code>) does not. Matches COBRApy <code>single_gene_deletion</code> exactly.</p>
+      <div class="studio-controls"><div><label class="fld">Strain model</label><div class="fba-combo"><input class="form-control form-control-sm fba-combo-input" id="genes-model-input" placeholder="Search species, strain or accession…" autocomplete="off"><div class="fba-combo-menu" id="genes-model-menu"></div></div><div class="fba-modelcard" id="genes-modelcard" style="display:none"></div></div><div><label class="fld">Growth medium</label><select class="form-select form-select-sm" id="genes-media"></select><div class="fba-media-desc" id="genes-media-desc"></div><label class="fld" style="margin-top:0.5rem">Genes to scan</label><select class="form-select form-select-sm" id="genes-scope"><option value="200">First 200 genes (fast)</option><option value="600">First 600 genes</option><option value="0">All genes (slow)</option></select></div><div><label class="fld">&nbsp;</label><button class="btn btn-primary btn-sm" id="genes-run" style="min-width:130px">▶ Run gene screen</button></div></div>
+      <div class="studio-progress" id="genes-prog"><div class="studio-progress-bar" id="genes-prog-bar"></div></div>
+      <div class="fba-status" id="genes-status"></div>
+      <div id="genes-results" style="display:none"><div class="fba-kpis" id="genes-kpis"></div><div class="studio-grid2"><div class="viz"><div class="viz-head"><span>Gene essentiality classes</span><button class="viz-dl" data-plot="genes-plot-pie" data-type="plotly">⬇ PNG</button></div><div id="genes-plot-pie" class="plot"></div></div><div class="viz"><div class="viz-head"><span>Growth-ratio distribution</span><button class="viz-dl" data-plot="genes-plot-hist" data-type="plotly">⬇ PNG</button></div><div id="genes-plot-hist" class="plot"></div></div></div><div id="genes-table" style="margin-top:0.8rem"></div><button class="btn btn-sm btn-outline-secondary mt-2" id="genes-csv">⬇ Download gene essentiality (CSV)</button></div>
+    </div>
+  </div>
+
+  <div class="studio-panel" id="panel-synlethal">
+    <div class="studio-card">
+      <h2>Synthetic Lethality</h2>
+      <p class="studio-sub">Double deletions. A pair is <b>synthetically lethal</b> when neither knockout hurts on its own but the two together kill the cell: the redundancy that single-gene screens miss. Pairwise over the candidates below, so keep the set small.</p>
+      <div class="studio-controls"><div><label class="fld">Strain model</label><div class="fba-combo"><input class="form-control form-control-sm fba-combo-input" id="syn-model-input" placeholder="Search species, strain or accession…" autocomplete="off"><div class="fba-combo-menu" id="syn-model-menu"></div></div><div class="fba-modelcard" id="syn-modelcard" style="display:none"></div></div><div><label class="fld">Growth medium</label><select class="form-select form-select-sm" id="syn-media"></select><div class="fba-media-desc" id="syn-media-desc"></div><label class="fld" style="margin-top:0.5rem">Delete</label><select class="form-select form-select-sm" id="syn-kind"><option value="reaction">Reaction pairs</option><option value="gene">Gene pairs</option></select><label class="fld" style="margin-top:0.5rem">Candidates</label><select class="form-select form-select-sm" id="syn-n"><option value="20">Top 20 (190 pairs)</option><option value="30">Top 30 (435 pairs)</option><option value="40">Top 40 (780 pairs)</option></select></div><div><label class="fld">&nbsp;</label><button class="btn btn-primary btn-sm" id="syn-run" style="min-width:130px">▶ Run double deletion</button></div></div>
+      <div class="studio-progress" id="syn-prog"><div class="studio-progress-bar" id="syn-prog-bar"></div></div>
+      <div class="fba-status" id="syn-status"></div>
+      <div id="syn-results" style="display:none"><div class="fba-kpis" id="syn-kpis"></div><div class="viz"><div class="viz-head"><span>Double-deletion growth matrix</span><button class="viz-dl" data-plot="syn-plot" data-type="plotly">⬇ PNG</button></div><div id="syn-plot" class="plot-tall"></div></div><div id="syn-table" style="margin-top:0.8rem"></div><button class="btn btn-sm btn-outline-secondary mt-2" id="syn-csv">⬇ Download pairs (CSV)</button></div>
+    </div>
+  </div>
+
+  <div class="studio-panel" id="panel-design">
+    <div class="studio-card">
+      <h2>Strain Design (FSEOF)</h2>
+      <p class="studio-sub">Flux Scanning with Enforced Objective Flux (Choi <i>et al.</i> 2010). Force secretion of a product upward in steps while the cell still maximises growth, and watch which internal reactions <b>have to</b> carry more flux. Those are your over-expression targets.</p>
+      <div class="studio-controls"><div><label class="fld">Strain model</label><div class="fba-combo"><input class="form-control form-control-sm fba-combo-input" id="fseof-model-input" placeholder="Search species, strain or accession…" autocomplete="off"><div class="fba-combo-menu" id="fseof-model-menu"></div></div><div class="fba-modelcard" id="fseof-modelcard" style="display:none"></div></div><div><label class="fld">Growth medium</label><select class="form-select form-select-sm" id="fseof-media"></select><div class="fba-media-desc" id="fseof-media-desc"></div><label class="fld" style="margin-top:0.5rem">Target product (exchange)</label><select class="form-select form-select-sm" id="fseof-product"></select><label class="fld" style="margin-top:0.5rem">Enforcement steps</label><input type="number" class="form-control form-control-sm" id="fseof-steps" value="10" min="4" max="20"></div><div><label class="fld">&nbsp;</label><button class="btn btn-primary btn-sm" id="fseof-run" style="min-width:130px">▶ Find targets</button></div></div>
+      <div class="studio-progress" id="fseof-prog"><div class="studio-progress-bar" id="fseof-prog-bar"></div></div>
+      <div class="fba-status" id="fseof-status"></div>
+      <div id="fseof-results" style="display:none"><div class="fba-kpis" id="fseof-kpis"></div><div class="studio-grid2"><div class="viz"><div class="viz-head"><span>Growth vs enforced product</span><button class="viz-dl" data-plot="fseof-plot-tradeoff" data-type="plotly">⬇ PNG</button></div><div id="fseof-plot-tradeoff" class="plot"></div></div><div class="viz"><div class="viz-head"><span>Amplification targets (flux vs enforced product)</span><button class="viz-dl" data-plot="fseof-plot-targets" data-type="plotly">⬇ PNG</button></div><div id="fseof-plot-targets" class="plot"></div></div></div><div id="fseof-table" style="margin-top:0.8rem"></div><button class="btn btn-sm btn-outline-secondary mt-2" id="fseof-csv">⬇ Download targets (CSV)</button></div>
+    </div>
+  </div>
+
+  <div class="studio-panel" id="panel-sampling">
+    <div class="studio-card">
+      <h2>Flux Sampling</h2>
+      <p class="studio-sub">ACHR hit-and-run through the flux solution space, the family COBRApy&rsquo;s OptGP belongs to. FBA gives you <i>one</i> optimum out of many; sampling shows the <b>distribution</b> a reaction can take while the cell still grows. Approximate: a few hundred warm-up points explore the space, they do not prove uniformity.</p>
+      <div class="studio-controls"><div><label class="fld">Strain model</label><div class="fba-combo"><input class="form-control form-control-sm fba-combo-input" id="samp-model-input" placeholder="Search species, strain or accession…" autocomplete="off"><div class="fba-combo-menu" id="samp-model-menu"></div></div><div class="fba-modelcard" id="samp-modelcard" style="display:none"></div></div><div><label class="fld">Growth medium</label><select class="form-select form-select-sm" id="samp-media"></select><div class="fba-media-desc" id="samp-media-desc"></div><label class="fld" style="margin-top:0.5rem">Samples</label><select class="form-select form-select-sm" id="samp-n"><option value="300">300 samples (fast)</option><option value="600">600 samples</option><option value="1000">1,000 samples</option></select><label class="fld" style="margin-top:0.5rem">Growth held at</label><select class="form-select form-select-sm" id="samp-frac"><option value="0.9">90% of optimum</option><option value="0.99">99% of optimum</option><option value="0.5">50% of optimum</option></select></div><div><label class="fld">&nbsp;</label><button class="btn btn-primary btn-sm" id="samp-run" style="min-width:130px">▶ Run sampling</button></div></div>
+      <div class="studio-progress" id="samp-prog"><div class="studio-progress-bar" id="samp-prog-bar"></div></div>
+      <div class="fba-status" id="samp-status"></div>
+      <div id="samp-results" style="display:none"><div class="fba-kpis" id="samp-kpis"></div><div class="viz"><div class="viz-head"><span>Exchange-flux distributions</span><button class="viz-dl" data-plot="samp-plot" data-type="plotly">⬇ PNG</button></div><div id="samp-plot" class="plot-tall"></div></div><button class="btn btn-sm btn-outline-secondary mt-2" id="samp-csv">⬇ Download samples (CSV)</button></div>
+    </div>
+  </div>
+
+  <div class="studio-panel" id="panel-qc">
+    <div class="studio-card">
+      <h2>Model QC</h2>
+      <p class="studio-sub">What is wrong with this reconstruction. <b>Blocked</b> reactions can carry no flux at all on this medium, so they are dead code. <b>Mass and charge imbalance</b> is checked from the stoichiometry and formulas, the way MEMOTE does it, with no solving. Dead-end metabolites are only ever produced or only ever consumed.</p>
+      <div class="studio-controls"><div><label class="fld">Strain model</label><div class="fba-combo"><input class="form-control form-control-sm fba-combo-input" id="qc-model-input" placeholder="Search species, strain or accession…" autocomplete="off"><div class="fba-combo-menu" id="qc-model-menu"></div></div><div class="fba-modelcard" id="qc-modelcard" style="display:none"></div></div><div><label class="fld">Growth medium</label><select class="form-select form-select-sm" id="qc-media"></select><div class="fba-media-desc" id="qc-media-desc"></div><label class="fld" style="margin-top:0.5rem">Blocked-reaction scan</label><select class="form-select form-select-sm" id="qc-scope"><option value="300">First 300 reactions (fast)</option><option value="800">First 800 reactions</option><option value="0">All reactions (slow)</option></select></div><div><label class="fld">&nbsp;</label><button class="btn btn-primary btn-sm" id="qc-run" style="min-width:130px">▶ Run QC</button></div></div>
+      <div class="studio-progress" id="qc-prog"><div class="studio-progress-bar" id="qc-prog-bar"></div></div>
+      <div class="fba-status" id="qc-status"></div>
+      <div id="qc-results" style="display:none"><div class="fba-kpis" id="qc-kpis"></div><div id="qc-tables" style="margin-top:0.9rem"></div><button class="btn btn-sm btn-outline-secondary mt-2" id="qc-csv">⬇ Download QC report (CSV)</button></div>
+    </div>
+  </div>
+
+</main>
+</div>
+
+<footer>
+  <p>Data: <a href="https://zenodo.org/records/17581962" target="_blank">Zenodo 10.5281/zenodo.17581962</a>
+  | Models: <a href="https://omidard.github.io/panGEMs/" target="_blank">panGEMs</a> | Media: <a href="https://omidard.github.io/Media/" target="_blank">Media</a> | Code: <a href="https://github.com/omidard/FluxStudio" target="_blank">github.com/omidard/FluxStudio</a>
+  | All computation runs locally in your browser (glpk.js · Escher · Plotly)</p>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="vendor/escher.min.js"></script>
+<script src="vendor/plotly.min.js"></script>
+<script>
+// Shared data + globals for the analysis modules
+/* Models come from the combined panGEMs collection, which already carries both
+   pangenomes: 2,313 EcopanGEM (batches 1-10) and 2,346 LactoPanGEM (11-47),
+   4,659 in total. Same origin, so no duplication of 450 MB of model batches.
+   Each metadata row carries `dataset`, which is what the collection badge and
+   the model filter key off. */
+const PANGEMS = 'https://omidard.github.io/panGEMs/';
+const BATCH_URL_BASE = PANGEMS + 'gems/gems_batch_';
+window.BATCH_URL_BASE = BATCH_URL_BASE;
+Promise.all([
+  fetch(PANGEMS + 'gems_metadata.json').then(r => r.json()),
+  fetch(PANGEMS + 'gem_batches.json').then(r => r.json())
+]).then(([data, batchMap]) => {
+  window.gemMetadata = data;
+  window.gemBatchMap = batchMap;
+  window.dispatchEvent(new Event('gem-data-ready'));
+}).catch(e => { console.error('data load failed', e); });
+</script>
+<script type="module" src="fba/fba_ui.js"></script>
+<script type="module" src="fba/studio.js"></script>
+<script>
+  (function () {
+    var root = document.documentElement, btn = document.getElementById('studio-theme');
+    if (!btn) return;
+    function apply(mode) {
+      root.setAttribute('data-theme', mode);
+      btn.setAttribute('aria-label', 'Switch to ' + (mode === 'dark' ? 'light' : 'dark') + ' theme');
+      btn.setAttribute('aria-pressed', String(mode === 'light'));
+    }
+    apply(root.getAttribute('data-theme') || 'dark');
+    btn.addEventListener('click', function () {
+      var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      apply(next);
+      try { localStorage.setItem('studio-theme', next); } catch (e) {}
+    });
+  })();
+</script>
+</body>
+</html>
