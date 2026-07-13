@@ -3,14 +3,11 @@
 **Constraint-based metabolic modelling, in your browser. No install, no server, no queue.**
 
 <a href="https://omidard.github.io/FluxStudio/">
-  <img src="https://img.shields.io/badge/Launch-Flux%20Studio-1E40AF?style=for-the-badge&labelColor=0B1220" alt="Launch Flux Studio">
+  <img src="docs/launch.svg" width="480" alt="Launch Flux Studio — omidard.github.io/FluxStudio">
 </a>
-<a href="https://omidard.github.io/panGEMs/">
-  <img src="https://img.shields.io/badge/4,659-strain%20models-3B82F6?style=for-the-badge&labelColor=0B1220" alt="4,659 models">
-</a>
-<a href="https://omidard.github.io/Media/">
-  <img src="https://img.shields.io/badge/12,340-growth%20media-15803D?style=for-the-badge&labelColor=0B1220" alt="12,340 media">
-</a>
+
+<a href="https://omidard.github.io/panGEMs/"><img src="https://img.shields.io/badge/4,659-strain%20models-2563EB?style=flat-square&labelColor=0B1220" alt="4,659 strain models"></a>
+<a href="https://omidard.github.io/Media/"><img src="https://img.shields.io/badge/12,340-growth%20media-15803D?style=flat-square&labelColor=0B1220" alt="12,340 growth media"></a>
 
 Pick a strain, pick a growth medium, and solve. Thirteen analyses, from flux balance
 analysis to synthetic lethality to strain design, over **4,659 genome-scale metabolic
