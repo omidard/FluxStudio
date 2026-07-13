@@ -6,8 +6,8 @@
   <img src="docs/launch.svg" width="480" alt="Launch Flux Studio — omidard.github.io/FluxStudio">
 </a>
 
-<a href="https://omidard.github.io/panGEMs/"><img src="https://img.shields.io/badge/4,659-strain%20models-2563EB?style=flat-square&labelColor=0B1220" alt="4,659 strain models"></a>
-<a href="https://omidard.github.io/Media/"><img src="https://img.shields.io/badge/12,340-growth%20media-15803D?style=flat-square&labelColor=0B1220" alt="12,340 growth media"></a>
+<a href="https://omidard.github.io/panGEMs/"><img src="https://img.shields.io/badge/4,659-strain%20models-2563EB?style=flat-square&labelColor=334155" alt="4,659 strain models"></a>
+<a href="https://omidard.github.io/Media/"><img src="https://img.shields.io/badge/12,340-growth%20media-15803D?style=flat-square&labelColor=334155" alt="12,340 growth media"></a>
 
 Pick a strain, pick a growth medium, and solve. Thirteen analyses, from flux balance
 analysis to synthetic lethality to strain design, over **4,659 genome-scale metabolic
