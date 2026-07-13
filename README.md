@@ -11,7 +11,7 @@
 
 Pick a strain, pick a growth medium, and solve. Thirteen analyses, from flux balance
 analysis to synthetic lethality to strain design, over **4,659 genome-scale metabolic
-models** (2,313 *Escherichia coli* and 2,346 Lactobacillaceae) and **12,340 curated
+models** (2,313 *Escherichia coli* and 2,346 Lactobacillaceae) and **12,340 semi-curated
 growth media**. The linear program is solved in your browser tab by a WebAssembly build
 of GLPK: your models and your media never leave your machine.
 
