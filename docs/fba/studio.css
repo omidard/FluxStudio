@@ -849,3 +849,9 @@ footer { text-align: center; padding: 1.8rem; color: var(--mute); font-size: .78
   content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%;
   background: var(--c); margin-right: 4px; vertical-align: 0;
 }
+
+/* Escher map switcher */
+.escher-mapbar{display:flex;align-items:center;gap:.5rem;margin:.15rem 0 .4rem}
+.escher-maplbl{font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted,#6b7a74)}
+.escher-mapsel{font-size:.82rem;padding:.2rem .5rem;border:1px solid #cfe0d9;border-radius:7px;background:#fff;color:var(--ink,#213);cursor:pointer;max-width:100%}
+.escher-mapsel:hover{border-color:#8bb39f}

@@ -683,8 +683,8 @@ function renderKO(RW, RK) {
       </div>
     </div>`;
 
-  renderEscher('ko-map-wt', null, fW);
-  renderEscher('ko-map-ko', 'ko-map-note', fK);
+  renderEscher('ko-map-wt', null, fW, cond.model);
+  renderEscher('ko-map-ko', 'ko-map-note', fK, cond.model);
 
   renderKOPlots({
     model: cond.model, media: cond.mediaBounds,
@@ -802,7 +802,7 @@ function renderSingle(R) {
     Object.keys(R.across).map(k => (cond.mediaSpec.kind === 'preset' && k === cond.mediaSpec.id) ? '#1a7f4b' : '#9db8d6'), 'Growth (h⁻¹)', false);
   barChart('ch-sec', rep.secretion.slice(0, 10).map(bio), rep.secretion.slice(0, 10).map(x => x.flux), '#c0392b', 'Flux', true);
   barChart('ch-up', rep.uptake.slice(0, 10).map(bio), rep.uptake.slice(0, 10).map(x => Math.abs(x.flux)), '#2c6fbb', 'Flux', true);
-  renderEscher('ch-map', 'ch-map-note', fluxes);
+  renderEscher('ch-map', 'ch-map-note', fluxes, cond.model);
   singleTables(cond, R, rep);
 }
 
@@ -859,8 +859,8 @@ function renderCompare(RA, RB) {
   groupedChart('cc-sec', topIds.map(id => id.replace(/^EX_/, '').replace(/_e$/, '')),
     topIds.map(id => mapA[id] || 0), topIds.map(id => mapB[id] || 0), 'Secretion flux');
 
-  renderEscher('cc-map-a', null, fA);
-  renderEscher('cc-map-b', null, fB);
+  renderEscher('cc-map-a', null, fA, RA.cond.model);
+  renderEscher('cc-map-b', null, fB, RB.cond.model);
   diffTable(RA, RB, fA, fB);
 }
 
@@ -909,20 +909,73 @@ function bio(x) { return x.id.replace(/^EX_/, '').replace(/_e$/, ''); }
 
 // ── Escher ────────────────────────────────────────────────────────────────────
 let coreMap = null;
-async function renderEscher(containerId, noteId, fluxes) {
+/* Re-key a model's flux vector onto the reaction ids the Escher map actually uses.
+   Two mismatches to bridge: (1) the objective/biomass reaction id differs per model
+   (e.g. BIOMASS_Ec_iML1515_core_75p37M) from the map's (BIOMASS_Ecoli_core_w_GAM),
+   so biomass never coloured; (2) BiGG id generations differ (stereo "__", "(e)"→"_e").
+   Returns fluxes augmented with the map's own ids so they render. */
+function remapFluxesToMap(fluxes, model, map) {
+  const mapData = Array.isArray(map) ? map[1] : map;
+  const mapIds = Object.values(mapData.reactions || {}).map(r => r.bigg_id);
+  const out = Object.assign({}, fluxes);
+  // (1) biomass: the model's objective flux -> every biomass reaction on the map
+  const obj = model && (model.reactions.find(r => r.objective_coefficient) || {}).id;
+  if (obj && fluxes[obj] != null) for (const id of mapIds) if (/biomass/i.test(id)) out[id] = fluxes[obj];
+  // (2) normalized fallback for stereo/compartment id-form differences
+  const norm = s => String(s).toLowerCase().replace(/[\[(]([a-z])[\])]$/, '_$1').replace(/_+/g, '_');
+  const byNorm = {}; for (const [k, v] of Object.entries(fluxes)) byNorm[norm(k)] = v;
+  for (const id of mapIds) if (out[id] == null) { const v = byNorm[norm(id)]; if (v != null) out[id] = v; }
+  return out;
+}
+// The bundled Escher maps the user can switch between (E. coli reference maps —
+// the pan-genome models share most BiGG ids with these).
+const ESCHER_MAPS = [
+  { id: 'core', label: 'Core metabolism (e_coli_core)', file: 'fba/maps/core.json' },
+  { id: 'central', label: 'Central metabolism (iJO1366)', file: 'fba/maps/central.json' },
+  { id: 'nucleotide', label: 'Nucleotide & histidine (iJO1366)', file: 'fba/maps/nucleotide.json' },
+  { id: 'fa_biosynth', label: 'Fatty-acid biosynthesis (iJO1366)', file: 'fba/maps/fa_biosynth.json' },
+  { id: 'fa_betaox', label: 'Fatty-acid β-oxidation (iJO1366)', file: 'fba/maps/fa_betaox.json' },
+];
+let escherMapId = 'core';
+const _mapCache = {};                 // id -> parsed map json
+const _escherState = {};              // containerId -> {noteId, fluxes, model}
+async function _loadMap(id) {
+  const m = ESCHER_MAPS.find(x => x.id === id) || ESCHER_MAPS[0];
+  if (!_mapCache[m.id]) _mapCache[m.id] = await (await fetch(m.file)).json();
+  return _mapCache[m.id];
+}
+window.setEscherMap = async function (id) {                 // called by the switcher
+  escherMapId = id;
+  for (const [cid, st] of Object.entries(_escherState)) await renderEscher(cid, st.noteId, st.fluxes, st.model);
+};
+function _mapSwitcher() {
+  return `<select class="escher-mapsel" onchange="setEscherMap(this.value)" title="Switch metabolic map">`
+    + ESCHER_MAPS.map(m => `<option value="${m.id}"${m.id === escherMapId ? ' selected' : ''}>${esc(m.label)}</option>`).join('')
+    + `</select>`;
+}
+async function renderEscher(containerId, noteId, fluxes, model) {
   const note = noteId ? $(noteId) : null;
+  const cont = $(containerId); if (!cont) return;
+  _escherState[containerId] = { noteId, fluxes, model };
   if (!window.escher) { if (note) note.textContent = 'Escher unavailable.'; return; }
   try {
-    if (!coreMap) coreMap = await (await fetch('fba/core_map.json')).json();
-    $(containerId).innerHTML = '';
-    window.escher.Builder(coreMap, null, null, window.escher.libs.d3_select('#' + containerId), {
+    const map = await _loadMap(escherMapId);
+    // one map switcher per container, inserted just above it
+    let sel = document.getElementById(containerId + '-mapsel');
+    if (!sel) { const d = document.createElement('div'); d.id = containerId + '-mapsel'; d.className = 'escher-mapbar';
+      d.innerHTML = `<span class="escher-maplbl">Map</span> ${_mapSwitcher()}`; cont.parentNode.insertBefore(d, cont); }
+    else { const s = sel.querySelector('select'); if (s) s.value = escherMapId; }
+    const mapped = remapFluxesToMap(fluxes, model, map);
+    cont.innerHTML = '';
+    window.escher.Builder(map, null, null, window.escher.libs.d3_select('#' + containerId), {
       menu: 'zoom', scroll_behavior: 'zoom', fill_screen: false, never_ask_before_quit: true,
-      reaction_data: fluxes, reaction_styles: ['color', 'size', 'text'],
+      reaction_data: mapped, reaction_styles: ['color', 'size', 'text'],
       reaction_scale: [
         { type: 'min', color: '#d0d0d0', size: 6 }, { type: 'value', value: 0, color: '#d0d0d0', size: 6 },
         { type: 'median', color: '#5b8ff9', size: 14 }, { type: 'max', color: '#c0392b', size: 28 }],
     });
-    if (note) note.textContent = 'Central-carbon metabolism (e_coli_core). Colour & thickness = |flux|; hover a reaction for its value. Reactions absent from this core map are not shown.';
+    const label = (ESCHER_MAPS.find(x => x.id === escherMapId) || {}).label || '';
+    if (note) note.textContent = `${label}. Colour & thickness = |flux|; biomass is mapped from the model's objective. Hover a reaction for its value; reactions absent from this map are not shown.`;
   } catch (e) { if (note) note.textContent = 'Map error: ' + e.message; console.error(e); }
 }
 
