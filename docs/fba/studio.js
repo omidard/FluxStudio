@@ -151,6 +151,7 @@ const TAB_META = {
   envelope: ['Production Envelope', 'The biomass-vs-product trade-off frontier for strain design.'],
   phaseplane: ['Phenotype Phase Plane', 'The growth surface over two uptake capacities.'],
   essential: ['Essentiality Screen', 'Single-reaction knockout scan across the network.'],
+  nutrient: ['Nutrient Essentiality', 'Leave-one-out on the medium — which nutrients are essential (auxotrophies) and which are dispensable.'],
   multi: ['Multi-model analytics', 'FBA across many strains — scatter, PCA and heatmaps.'],
   cohort: ['Group comparison', 'Test which metabolic traits differ between metadata-defined groups.'],
 };
