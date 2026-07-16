@@ -77,10 +77,10 @@ async function loadModel(gemFile) {
    Every model picker goes through makeCombo, so registering the loader here catches
    all eleven of them without touching each call site. */
 const TAB_BY_PREFIX = { fva: 'fva', dfba: 'dfba', mm: 'multi', env: 'envelope', pp: 'phaseplane',
-  ess: 'essential', genes: 'genes', syn: 'synlethal', fseof: 'design', samp: 'sampling', qc: 'qc', nut: 'nutrient' };
+  ess: 'essential', genes: 'genes', syn: 'synlethal', fseof: 'design', samp: 'sampling', qc: 'qc', nut: 'nutrient', rob: 'robust' };
 const MEDIA_SELECT = { fva: 'fva-media', dfba: 'dfba-media', multi: 'mm-media', cohort: 'cohort-media',
   envelope: 'env-media', phaseplane: 'pp-media', essential: 'ess-media', genes: 'genes-media',
-  synlethal: 'syn-media', design: 'fseof-media', sampling: 'samp-media', qc: 'qc-media', nutrient: 'nut-media' };
+  synlethal: 'syn-media', design: 'fseof-media', sampling: 'samp-media', qc: 'qc-media', nutrient: 'nut-media', robust: 'rob-media' };
 const MODEL_LOADERS = {};
 
 function makeCombo(input, menu, onPick) {
@@ -152,6 +152,7 @@ const TAB_META = {
   phaseplane: ['Phenotype Phase Plane', 'The growth surface over two uptake capacities.'],
   essential: ['Essentiality Screen', 'Single-reaction knockout scan across the network.'],
   nutrient: ['Nutrient Essentiality', 'Leave-one-out on the medium — which nutrients are essential (auxotrophies) and which are dispensable.'],
+  robust: ['Robustness Scan', 'Sweep one nutrient&rsquo;s uptake capacity and trace the growth response.'],
   multi: ['Multi-model analytics', 'FBA across many strains — scatter, PCA and heatmaps.'],
   cohort: ['Group comparison', 'Test which metabolic traits differ between metadata-defined groups.'],
 };
@@ -951,12 +952,96 @@ function renderNutrient(res) {
   $('nut-csv').onclick = () => { let c = 'exchange_id,nutrient,uptake_bound,growth_without,ratio,class\n'; rows.forEach(r => c += `${r.id},"${(r.name || '').replace(/"/g, '""')}",${r.bound},${r.growth},${r.ratio},${r.cls}\n`); saveCSV(c, `nutrient_essentiality_${nutState.file.replace(/\.json.*/, '')}_${$('nut-media').value}`); };
 }
 
+// ── Robustness scan (sweep one nutrient's uptake capacity) ────────────────────
+const robState = { model: null, file: null };
+function initRobust() {
+  fillMedia($('rob-media'), null);
+  attachMedia('rob-media', robState);
+  wireModelPicker('rob-model-input', 'rob-model-menu', 'rob-modelcard', robState, (model) => {
+    const exs = listExchanges(model);
+    $('rob-control').innerHTML = exs.map(e => `<option value="${e.id}">${bio(e.id)} (${e.id})</option>`).join('');
+    const gx = pickGlc(exs.map(e => e.id));
+    if (gx) $('rob-control').value = gx;
+  });
+  $('rob-run').addEventListener('click', runRobust);
+}
+async function runRobust() {
+  if (!robState.model) return setStatus('rob-status', 'Choose a model first.', 'err');
+  const model = robState.model, media = mediaOf(robState, 'rob-media'), control = $('rob-control').value;
+  if (!control) return setStatus('rob-status', 'Choose a nutrient to sweep.', 'err');
+  const vMax = Math.max(0.1, +$('rob-max').value || 20), n = Math.max(5, Math.min(60, +$('rob-n').value || 25));
+  const cname = bio(control);
+  $('rob-run').disabled = true; $('rob-results').style.display = 'none';
+  setStatus('rob-status', `Sweeping ${cname} uptake over ${n} levels…`, 'busy'); prog('rob-prog', 'rob-prog-bar', 0);
+  try {
+    const t0 = performance.now();
+    const pts = [];
+    for (let i = 0; i < n; i++) {
+      const cap = vMax * i / (n - 1);
+      const m2 = Object.assign({}, media); m2[control] = -cap;   // allow uptake up to `cap`
+      const fba = await runFBA(model, m2);
+      pts.push({ cap, growth: fba.optimal ? fba.growth : 0 });
+      if (i % 3 === 0 || i === n - 1) { prog('rob-prog', 'rob-prog-bar', (i + 1) / n); setStatus('rob-status', `Solved ${i + 1}/${n}…`, 'busy'); }
+    }
+    prog('rob-prog', 'rob-prog-bar', null);
+    renderRobust({ pts, control, cname, vMax });
+    setStatus('rob-status', `Done — ${n} solves in ${((performance.now() - t0) / 1000).toFixed(1)} s.`, 'ok');
+  } catch (e) { setStatus('rob-status', 'Error: ' + e.message, 'err'); console.error(e); prog('rob-prog', 'rob-prog-bar', null); }
+  finally { $('rob-run').disabled = false; }
+}
+function renderRobust(res) {
+  const { pts, cname } = res, EPS = 1e-6;
+  const gMax = pts.reduce((a, b) => Math.max(a, b.growth), 0);
+  const gAt0 = pts[0].growth, gAtMax = pts[pts.length - 1].growth;
+  // smallest capacity reaching a growth threshold
+  const firstAtLeast = f => { const hit = pts.find(p => p.growth >= f * gMax - EPS); return hit ? hit.cap : null; };
+  const critical = pts.find(p => p.growth > EPS);                       // least supply giving any growth
+  const criticalCap = (gAt0 > EPS) ? 0 : (critical ? critical.cap : null);
+  const halfCap = gMax > EPS ? firstAtLeast(0.5) : null;
+  const satCap = gMax > EPS ? firstAtLeast(0.99) : null;
+  const limiting = (gMax - gAt0) > 1e-3 && (gMax - gAt0) / gMax > 0.02;  // does more supply help?
+  const saturates = satCap != null && satCap < res.vMax - EPS;          // plateau reached before the max
+  $('rob-results').style.display = 'block';
+  $('rob-kpis').innerHTML =
+    `<div class="fba-kpi"><div class="v">${fmt(gMax, 3)}</div><div class="l">Max growth (h⁻¹)</div></div>
+     <div class="fba-kpi"><div class="v">${criticalCap == null ? '—' : (criticalCap === 0 ? '0' : fmt(criticalCap, 2))}</div><div class="l">Critical uptake</div></div>
+     <div class="fba-kpi"><div class="v">${satCap == null ? '—' : fmt(satCap, 2)}</div><div class="l">Saturation uptake</div></div>
+     <div class="fba-kpi"><div class="v" style="color:${limiting ? 'var(--warn)' : 'var(--ok,#2e9e5b)'}">${limiting ? 'Yes' : 'No'}</div><div class="l">Limiting here?</div></div>`;
+  $('rob-interp').innerHTML =
+    `<b>Interpretation.</b> Growth is traced against how much <b>${esc(cname)}</b> the cell may take up, from 0 to ${fmt(res.vMax, 1)} mmol·gDW⁻¹·h⁻¹. `
+    + (gMax <= EPS
+      ? `The strain does not grow at any supply level — <b>${esc(cname)}</b> alone cannot lift the other constraints of this medium.`
+      : (criticalCap && criticalCap > EPS
+          ? `Below ≈ <b>${fmt(criticalCap, 2)}</b> there is no growth — that is the <b>critical supply</b> this nutrient must exceed. `
+          : `Some growth persists even at zero supply, so this nutrient is not strictly required on this medium. `)
+        + (limiting
+            ? `Growth keeps rising with supply` + (saturates
+                ? ` until it plateaus at <b>${fmt(gMax, 3)}</b> h⁻¹ near an uptake of <b>${fmt(satCap, 2)}</b>; beyond that, <b>${esc(cname)}</b> is in excess and something else becomes limiting. Half-maximal growth is reached at ≈ ${fmt(halfCap, 2)}.`
+                : `right up to the scanned maximum — it is <b>growth-limiting across this whole range</b>, so raising it further (extend “Max uptake”) would likely help still more.`)
+            : `Growth is essentially flat: <b>${esc(cname)}</b> is <b>not limiting</b> here — it is already supplied in excess relative to the true bottleneck, so feeding more of it buys nothing.`));
+  const xs = pts.map(p => p.cap), ys = pts.map(p => p.growth);
+  const shapes = [];
+  if (saturates && satCap != null) shapes.push({ type: 'line', x0: satCap, x1: satCap, y0: 0, y1: gMax, line: { color: '#e08a1e', width: 1.2, dash: 'dot' } });
+  if (criticalCap && criticalCap > EPS) shapes.push({ type: 'line', x0: criticalCap, x1: criticalCap, y0: 0, y1: gMax, line: { color: '#c0392b', width: 1.2, dash: 'dot' } });
+  window.Plotly.newPlot('rob-plot', [{
+    type: 'scatter', mode: 'lines+markers', x: xs, y: ys, line: { color: '#2c6fbb', width: 2.2 }, marker: { size: 5, color: '#2c6fbb' },
+    fill: 'tozeroy', fillcolor: 'rgba(44,111,187,0.10)', hovertemplate: `${esc(cname)} uptake %{x:.2f}<br>growth %{y:.3f} h⁻¹<extra></extra>`,
+  }], {
+    margin: { l: 55, r: 15, t: 12, b: 48 }, height: 380, shapes,
+    xaxis: { title: `${cname} uptake capacity (mmol·gDW⁻¹·h⁻¹)`, zeroline: true }, yaxis: { title: 'max growth rate (h⁻¹)', rangemode: 'tozero' }, font: { size: 11 },
+  }, { responsive: true, displaylogo: false });
+  $('rob-table').innerHTML = `<div class="fba-hint-inline" style="margin-bottom:4px">Growth at each uptake level:</div>
+    <div class="fba-tablewrap" style="max-height:300px"><table class="fba-flux"><thead><tr><th>${esc(cname)} uptake</th><th>Max growth (h⁻¹)</th><th>Fraction of max</th></tr></thead>
+    <tbody>${pts.map(p => `<tr><td class="num">${fmt(p.cap, 2)}</td><td class="num">${fmt(p.growth)}</td><td class="num">${gMax > EPS ? fmt(p.growth / gMax, 3) : '—'}</td></tr>`).join('')}</tbody></table></div>`;
+  $('rob-csv').onclick = () => { let c = 'uptake_capacity,max_growth,fraction_of_max\n'; pts.forEach(p => c += `${p.cap},${p.growth},${gMax > EPS ? p.growth / gMax : 0}\n`); saveCSV(c, `robustness_${bio(res.control)}_${robState.file.replace(/\.json.*/, '')}_${$('rob-media').value}`); };
+}
+
 // ── init ──────────────────────────────────────────────────────────────────────
 async function init() {
   await presets();
   await mediaPresets();      // the shared picker keeps its own copy; load it before mounting
   initNav(); initFVA(); initDFBA(); initMulti(); initCohort(); initEnvelope(); initPhasePlane(); initEssential();
-  initGenes(); initSyn(); initFseof(); initSamp(); initQC(); initNutrient();
+  initGenes(); initSyn(); initFseof(); initSamp(); initQC(); initNutrient(); initRobust();
   wireDownloads(); decorateStaticPlots();
 
   const q = new URLSearchParams(location.search);
