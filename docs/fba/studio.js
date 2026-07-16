@@ -77,10 +77,10 @@ async function loadModel(gemFile) {
    Every model picker goes through makeCombo, so registering the loader here catches
    all eleven of them without touching each call site. */
 const TAB_BY_PREFIX = { fva: 'fva', dfba: 'dfba', mm: 'multi', env: 'envelope', pp: 'phaseplane',
-  ess: 'essential', genes: 'genes', syn: 'synlethal', fseof: 'design', samp: 'sampling', qc: 'qc' };
+  ess: 'essential', genes: 'genes', syn: 'synlethal', fseof: 'design', samp: 'sampling', qc: 'qc', nut: 'nutrient' };
 const MEDIA_SELECT = { fva: 'fva-media', dfba: 'dfba-media', multi: 'mm-media', cohort: 'cohort-media',
   envelope: 'env-media', phaseplane: 'pp-media', essential: 'ess-media', genes: 'genes-media',
-  synlethal: 'syn-media', design: 'fseof-media', sampling: 'samp-media', qc: 'qc-media' };
+  synlethal: 'syn-media', design: 'fseof-media', sampling: 'samp-media', qc: 'qc-media', nutrient: 'nut-media' };
 const MODEL_LOADERS = {};
 
 function makeCombo(input, menu, onPick) {
@@ -840,12 +840,85 @@ function renderEss(res, n) {
   $('ess-csv').onclick = () => { let c = 'reaction_id,name,subsystem,ko_growth,ratio,class\n'; rows.forEach(r => c += `${r.id},"${(r.name || '').replace(/"/g, '""')}","${(r.subsystem || '').replace(/"/g, '""')}",${r.growth},${r.ratio},${r.cls}\n`); saveCSV(c, `essentiality_${essState.file.replace(/\.json.*/, '')}_${$('ess-media').value}`); };
 }
 
+// ── Nutrient essentiality (leave-one-out on the medium) ───────────────────────
+const nutState = { model: null, file: null };
+function initNutrient() {
+  fillMedia($('nut-media'), null);
+  attachMedia('nut-media', nutState);
+  wireModelPicker('nut-model-input', 'nut-model-menu', 'nut-modelcard', nutState);
+  $('nut-run').addEventListener('click', runNutrient);
+}
+const NUT_COLORS = { Essential: '#c0392b', Severe: '#e08a1e', Mild: '#5b8ff9', Dispensable: '#cfd8e3' };
+function nutClass(ratio) { return ratio < 0.01 ? 'Essential' : ratio < 0.5 ? 'Severe' : ratio < 0.95 ? 'Mild' : 'Dispensable'; }
+async function runNutrient() {
+  if (!nutState.model) return setStatus('nut-status', 'Choose a model first.', 'err');
+  const model = nutState.model, media = mediaOf(nutState, 'nut-media');
+  const nameById = {}; listExchanges(model).forEach(e => nameById[e.id] = e.name);
+  const comps = Object.keys(media).filter(id => media[id] < 0);   // the nutrients taken up
+  if (!comps.length) return setStatus('nut-status', 'This medium has no uptake components to test.', 'err');
+  $('nut-run').disabled = true; $('nut-results').style.display = 'none';
+  setStatus('nut-status', 'Computing full-medium growth…', 'busy'); prog('nut-prog', 'nut-prog-bar', 0);
+  try {
+    const t0 = performance.now();
+    const wt = await runFBA(model, media);
+    const wtGrowth = wt.optimal ? wt.growth : 0;
+    if (wtGrowth <= 1e-6) {
+      setStatus('nut-status', 'No growth on the full medium — nothing to leave out. Try a richer medium or open the essential inorganic ions.', 'err');
+      $('nut-run').disabled = false; prog('nut-prog', 'nut-prog-bar', null); return;
+    }
+    const rows = [];
+    for (let i = 0; i < comps.length; i++) {
+      const id = comps[i], m2 = Object.assign({}, media); delete m2[id];   // remove this nutrient
+      const fba = await runFBA(model, m2);
+      const growth = fba.optimal ? fba.growth : 0;
+      rows.push({ id, name: (nameById[id] || id).replace(/ exchange$/i, ''), bound: media[id], growth, ratio: growth / wtGrowth });
+      if (i % 5 === 0 || i === comps.length - 1) { prog('nut-prog', 'nut-prog-bar', (i + 1) / comps.length); setStatus('nut-status', `Tested ${i + 1}/${comps.length} nutrients…`, 'busy'); }
+    }
+    prog('nut-prog', 'nut-prog-bar', null);
+    renderNutrient({ wtGrowth, rows });
+    setStatus('nut-status', `Done — ${comps.length} nutrients in ${((performance.now() - t0) / 1000).toFixed(1)} s. Full-medium growth ${fmt(wtGrowth)} h⁻¹.`, 'ok');
+  } catch (e) { setStatus('nut-status', 'Error: ' + e.message, 'err'); console.error(e); prog('nut-prog', 'nut-prog-bar', null); }
+  finally { $('nut-run').disabled = false; }
+}
+function renderNutrient(res) {
+  const rows = res.rows.map(r => ({ ...r, cls: nutClass(r.ratio) })).sort((a, b) => a.ratio - b.ratio);
+  const counts = { Essential: 0, Severe: 0, Mild: 0, Dispensable: 0 };
+  rows.forEach(r => counts[r.cls]++);
+  $('nut-results').style.display = 'block';
+  $('nut-kpis').innerHTML =
+    `<div class="fba-kpi"><div class="v" style="color:var(--bad)">${counts.Essential}</div><div class="l">Essential (auxotrophy)</div></div>
+     <div class="fba-kpi"><div class="v" style="color:var(--warn)">${counts.Severe}</div><div class="l">Severe (&lt;50%)</div></div>
+     <div class="fba-kpi"><div class="v" style="color:var(--primary)">${counts.Mild}</div><div class="l">Mild (&lt;95%)</div></div>
+     <div class="fba-kpi"><div class="v">${counts.Dispensable}</div><div class="l">Dispensable</div></div>`;
+  // interpretation
+  const ess = rows.filter(r => r.cls === 'Essential').map(r => r.name);
+  const sev = rows.filter(r => r.cls === 'Severe').map(r => r.name);
+  $('nut-interp').innerHTML =
+    `<b>Interpretation.</b> Of ${rows.length} nutrients in this medium, <b style="color:var(--bad)">${ess.length}</b> ${ess.length === 1 ? 'is' : 'are'} <b>essential</b> — removing ${ess.length === 1 ? 'it' : 'any one'} abolishes growth, so the strain is auxotrophic for ${ess.length ? '<b>' + ess.slice(0, 10).map(esc).join(', ') + (ess.length > 10 ? ` … +${ess.length - 10} more` : '') + '</b>' : 'none of them'}. `
+    + (sev.length ? `${sev.length} more cause a <b style="color:var(--warn)">severe</b> (&gt;50%) drop (${sev.slice(0, 6).map(esc).join(', ')}${sev.length > 6 ? '…' : ''}). ` : '')
+    + `${counts.Dispensable} are <b>dispensable</b> (growth unchanged when removed) — the strain either synthesises them or has an alternative source. A nutrient reads as dispensable if the model has a redundant route, so essentiality is medium-dependent: edit the medium above and re-run to probe a different formulation.`;
+  // horizontal bar chart: growth ratio per nutrient (most essential at top)
+  const show = rows.slice(0, 45);
+  window.Plotly.newPlot('nut-plot-bar', [{
+    type: 'bar', orientation: 'h', x: show.map(r => r.ratio).reverse(), y: show.map(r => r.name).reverse(),
+    marker: { color: show.map(r => NUT_COLORS[r.cls]).reverse() },
+    hovertemplate: '%{y}: %{x:.3f}× growth<extra></extra>',
+  }], {
+    margin: { l: 160, r: 20, t: 10, b: 40 }, height: Math.max(260, 18 * show.length + 60),
+    xaxis: { title: 'growth / full-medium growth', range: [0, 1.05], zeroline: true }, font: { size: 11 },
+  }, { responsive: true, displaylogo: false });
+  $('nut-table').innerHTML = `<div class="fba-hint-inline" style="margin-bottom:4px">All ${rows.length} nutrients, most essential first:</div>
+    <div class="fba-tablewrap" style="max-height:320px"><table class="fba-flux"><thead><tr><th>Nutrient</th><th>Exchange</th><th>Uptake bound</th><th>Growth without it</th><th>Ratio</th><th>Class</th></tr></thead>
+    <tbody>${rows.map(r => `<tr><td>${esc(r.name)}</td><td><code>${esc(r.id)}</code></td><td class="num">${fmt(r.bound, 2)}</td><td class="num">${fmt(r.growth)}</td><td class="num" style="color:${NUT_COLORS[r.cls]}">${fmt(r.ratio, 3)}</td><td>${r.cls}</td></tr>`).join('')}</tbody></table></div>`;
+  $('nut-csv').onclick = () => { let c = 'exchange_id,nutrient,uptake_bound,growth_without,ratio,class\n'; rows.forEach(r => c += `${r.id},"${(r.name || '').replace(/"/g, '""')}",${r.bound},${r.growth},${r.ratio},${r.cls}\n`); saveCSV(c, `nutrient_essentiality_${nutState.file.replace(/\.json.*/, '')}_${$('nut-media').value}`); };
+}
+
 // ── init ──────────────────────────────────────────────────────────────────────
 async function init() {
   await presets();
   await mediaPresets();      // the shared picker keeps its own copy; load it before mounting
   initNav(); initFVA(); initDFBA(); initMulti(); initCohort(); initEnvelope(); initPhasePlane(); initEssential();
-  initGenes(); initSyn(); initFseof(); initSamp(); initQC();
+  initGenes(); initSyn(); initFseof(); initSamp(); initQC(); initNutrient();
   wireDownloads(); decorateStaticPlots();
 
   const q = new URLSearchParams(location.search);
