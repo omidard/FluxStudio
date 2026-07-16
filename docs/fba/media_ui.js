@@ -9,7 +9,7 @@
    resolved across BiGG naming generations, and what is simply not in this model.
    ────────────────────────────────────────────────────────────────────────── */
 import * as MediaDB from './media.js';
-import { bindMedium } from './fba_engine.js';
+import { bindMedium, listExchanges } from './fba_engine.js';
 
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -123,11 +123,26 @@ export function mountMediaPicker(selectEl, state, opts = {}) {
     </button>
     <div class="media-report"></div>
     <label class="media-min"><input type="checkbox" class="me-minerals"> open essential inorganic ions and water</label>`;
+  // editable compound editor (add / remove exchanges, change uptake flux) — available in every analysis
+  const editWrap = document.createElement('div');
+  editWrap.className = 'media-editwrap';
+  editWrap.innerHTML = `<button type="button" class="media-edit-toggle">edit compounds</button>
+    <div class="fba-media-editor media-editor" style="display:none"></div>`;
+  host.appendChild(editWrap);
+
   const anchor = selectEl.nextElementSibling && selectEl.nextElementSibling.classList.contains('fba-media-desc')
     ? selectEl.nextElementSibling : selectEl;
   anchor.parentNode.insertBefore(host, anchor.nextSibling);
   state._mediaHost = host;
   MediaDB.fillCount(host.querySelector('.mc'), n => `all ${n.toLocaleString()}`);
+
+  const toggle = editWrap.querySelector('.media-edit-toggle');
+  toggle.addEventListener('click', () => {
+    const box = editWrap.querySelector('.media-editor');
+    if (box.style.display === 'none') { box.style.display = 'block'; renderEditor(state); toggle.textContent = 'hide compounds'; }
+    else { box.style.display = 'none'; toggle.textContent = 'edit compounds'; }
+  });
+  state._renderEditor = () => { const box = editWrap.querySelector('.media-editor'); if (box && box.style.display !== 'none') renderEditor(state); };
 
   state.mediaSpec = presetSpec(selectEl.value);
   state.openMinerals = false;
@@ -159,8 +174,10 @@ export function rebind(state) {
     const r = bindMedium(state.model, state.mediaSpec.components, { openMinerals: state.openMinerals });
     state.mediaBounds = r.bounds;
     state.mediaReport = r;
+    state.mediaEdited = false;                 // fresh medium binding — edits cleared
   }
   renderReport(state);
+  if (state._renderEditor) state._renderEditor();
 }
 
 /** Called when a model finishes loading: pick a medium the organism can grow on. */
@@ -175,6 +192,62 @@ export function adoptDefaultMedium(state, selectEl) {
     state._swapped = PRESETS[want].label;
   }
   rebind(state);
+}
+
+/* The editable-compound table, mounted in the shared picker so every analysis can
+   add/remove exchanges and change uptake fluxes. Edits mutate state.mediaBounds
+   in place; each analysis's run reads that (via mediaOf/state.mediaBounds). */
+function renderEditor(state) {
+  const host = state._mediaHost; if (!host) return;
+  const box = host.querySelector('.media-editor'); if (!box) return;
+  if (!state.model || !state.mediaBounds) {
+    box.innerHTML = `<div class="me-head fba-hint-inline">Load a model and choose a medium to edit its compounds.</div>`;
+    return;
+  }
+  if (!state._exchanges || state._exModel !== state.model) {              // recompute when the model changes
+    state._exchanges = listExchanges(state.model); state._exModel = state.model;
+  }
+  const nameById = {}; state._exchanges.forEach(e => nameById[e.id] = e.name);
+  const rows = Object.entries(state.mediaBounds).sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([id, lb]) => `
+      <tr data-id="${id}">
+        <td class="me-cmpd">${esc((nameById[id] || '').replace(/ exchange$/i, ''))}</td>
+        <td class="me-id">${esc(id)}</td>
+        <td><input type="number" step="0.1" class="me-rate" value="${lb}"></td>
+        <td><span class="fba-me-rm" title="remove">✕</span></td>
+      </tr>`).join('');
+  box.innerHTML = `
+    <div class="me-head"><b>Uptake bounds (mmol·gDW⁻¹·h⁻¹) — negative = uptake</b>
+      <span class="fba-hint-inline">${Object.keys(state.mediaBounds).length} compounds${state.mediaEdited ? ' · edited' : ''}</span></div>
+    <div class="fba-me-list"><table class="fba-me"><tbody>${rows}</tbody></table></div>
+    <div class="fba-me-add">
+      <input class="form-control form-control-sm me-add-input" placeholder="+ add compound (search exchange)…" autocomplete="off">
+      <div class="fba-combo-menu me-add-menu"></div>
+    </div>`;
+  box.querySelectorAll('.me-rate').forEach(inp => inp.addEventListener('change', () => {
+    const id = inp.closest('tr').dataset.id, v = parseFloat(inp.value);
+    if (!isNaN(v)) { state.mediaBounds[id] = v; state.mediaEdited = true; renderReport(state); }
+  }));
+  box.querySelectorAll('.fba-me-rm').forEach(x => x.addEventListener('click', () => {
+    delete state.mediaBounds[x.closest('tr').dataset.id]; state.mediaEdited = true; renderEditor(state); renderReport(state);
+  }));
+  const ai = box.querySelector('.me-add-input'), am = box.querySelector('.me-add-menu');
+  let addItems = [];
+  const renderAdd = () => {
+    const q = ai.value.trim().toLowerCase();
+    const avail = state._exchanges.filter(e => !(e.id in state.mediaBounds));
+    addItems = (q ? avail.filter(e => e.id.toLowerCase().includes(q) || (e.name || '').toLowerCase().includes(q)) : avail).slice(0, 30);
+    am.innerHTML = addItems.length ? addItems.map((e, i) =>
+      `<div class="fba-combo-item" data-i="${i}"><div class="nm">${esc((e.name || '').replace(/ exchange$/i, ''))}</div><div class="id">${esc(e.id)}</div></div>`).join('')
+      : `<div class="fba-combo-empty">No more exchanges.</div>`;
+    am.classList.add('show');
+  };
+  ai.addEventListener('focus', renderAdd); ai.addEventListener('input', renderAdd);
+  ai.addEventListener('blur', () => setTimeout(() => am.classList.remove('show'), 150));
+  am.addEventListener('mousedown', (e) => {
+    const it = e.target.closest('.fba-combo-item'); if (!it) return; e.preventDefault();
+    state.mediaBounds[addItems[+it.dataset.i].id] = -0.5; state.mediaEdited = true; renderEditor(state); renderReport(state);
+  });
 }
 
 function renderReport(state) {

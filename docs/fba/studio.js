@@ -974,7 +974,7 @@ function initSyn() {
 async function runSyn() {
   if (!synState.model) return setStatus('syn-status', 'Choose a model first.', 'err');
   const model = synState.model;
-  const media = mediaFor(model, $('syn-media').value);
+  const media = mediaOf(synState, 'syn-media');
   const kind = $('syn-kind').value, n = +$('syn-n').value;
   const btn = $('syn-run'); btn.disabled = true;
   setStatus('syn-status', 'Ranking candidates by single-deletion impact…', 'busy');
@@ -1174,7 +1174,7 @@ function initQC() {
 async function runQC() {
   if (!qcState.model) return setStatus('qc-status', 'Choose a model first.', 'err');
   const model = qcState.model;
-  const media = mediaFor(model, $('qc-media').value);
+  const media = mediaOf(qcState, 'qc-media');
   const cap = +$('qc-scope').value;
   const btn = $('qc-run'); btn.disabled = true;
   setStatus('qc-status', 'Checking mass and charge balance…', 'busy');
