@@ -140,6 +140,8 @@
       <div class="studio-progress" id="fva-prog"><div class="studio-progress-bar" id="fva-prog-bar"></div></div>
       <div class="fba-status" id="fva-status"></div>
       <div id="fva-results" style="display:none">
+        <div class="fba-kpis" id="fva-kpis"></div>
+        <div id="fva-interp" class="fba-note" style="margin:0.6rem 0"></div>
         <div id="fva-plot" class="plot-tall"></div>
         <div id="fva-table" style="margin-top:1rem"></div>
       </div>
@@ -294,6 +296,7 @@
       <div class="studio-progress" id="env-prog"><div class="studio-progress-bar" id="env-prog-bar"></div></div>
       <div class="fba-status" id="env-status"></div>
       <div id="env-results" style="display:none">
+        <div id="env-interp" class="fba-note" style="margin:0.6rem 0"></div>
         <div class="viz"><div class="viz-head"><span>Growth vs production envelope</span><button class="viz-dl" data-plot="env-plot" data-type="plotly">⬇ PNG</button></div><div id="env-plot" class="plot-tall"></div></div>
         <div id="env-note" class="fba-map-note"></div>
       </div>
@@ -314,6 +317,7 @@
       <div class="studio-progress" id="pp-prog"><div class="studio-progress-bar" id="pp-prog-bar"></div></div>
       <div class="fba-status" id="pp-status"></div>
       <div id="pp-results" style="display:none">
+        <div id="pp-interp" class="fba-note" style="margin:0.6rem 0"></div>
         <div class="viz"><div class="viz-head"><span>Growth-rate surface (h⁻¹)</span><button class="viz-dl" data-plot="pp-plot" data-type="plotly">⬇ PNG</button></div><div id="pp-plot" class="plot-tall"></div></div>
       </div>
     </div>
@@ -408,7 +412,7 @@
       <div class="studio-controls"><div><label class="fld">Strain model</label><div class="fba-combo"><input class="form-control form-control-sm fba-combo-input" id="samp-model-input" placeholder="Search species, strain or accession…" autocomplete="off"><div class="fba-combo-menu" id="samp-model-menu"></div></div><div class="fba-modelcard" id="samp-modelcard" style="display:none"></div></div><div><label class="fld">Growth medium</label><select class="form-select form-select-sm" id="samp-media"></select><div class="fba-media-desc" id="samp-media-desc"></div><label class="fld" style="margin-top:0.5rem">Samples</label><select class="form-select form-select-sm" id="samp-n"><option value="300">300 samples (fast)</option><option value="600">600 samples</option><option value="1000">1,000 samples</option></select><label class="fld" style="margin-top:0.5rem">Growth held at</label><select class="form-select form-select-sm" id="samp-frac"><option value="0.9">90% of optimum</option><option value="0.99">99% of optimum</option><option value="0.5">50% of optimum</option></select></div><div><label class="fld">&nbsp;</label><button class="btn btn-primary btn-sm" id="samp-run" style="min-width:130px">▶ Run sampling</button></div></div>
       <div class="studio-progress" id="samp-prog"><div class="studio-progress-bar" id="samp-prog-bar"></div></div>
       <div class="fba-status" id="samp-status"></div>
-      <div id="samp-results" style="display:none"><div class="fba-kpis" id="samp-kpis"></div><div class="viz"><div class="viz-head"><span>Exchange-flux distributions</span><button class="viz-dl" data-plot="samp-plot" data-type="plotly">⬇ PNG</button></div><div id="samp-plot" class="plot-tall"></div></div><button class="btn btn-sm btn-outline-secondary mt-2" id="samp-csv">⬇ Download samples (CSV)</button></div>
+      <div id="samp-results" style="display:none"><div class="fba-kpis" id="samp-kpis"></div><div id="samp-interp" class="fba-note" style="margin:0.6rem 0"></div><div class="viz"><div class="viz-head"><span>Exchange-flux distributions</span><button class="viz-dl" data-plot="samp-plot" data-type="plotly">⬇ PNG</button></div><div id="samp-plot" class="plot-tall"></div></div><button class="btn btn-sm btn-outline-secondary mt-2" id="samp-csv">⬇ Download samples (CSV)</button></div>
     </div>
   </div>
 

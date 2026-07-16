@@ -229,6 +229,23 @@ function renderFVA(res, model) {
   rows.sort((a, b) => b.span - a.span);
   const top = rows.slice(0, 30).reverse();
   $('fva-results').style.display = 'block';
+  // interpretation
+  const EPS = 1e-6;
+  const fixed = rows.filter(r => r.span < EPS);
+  const variable = rows.filter(r => r.span >= EPS);
+  const reversible = rows.filter(r => r.min < -EPS && r.max > EPS);
+  const widest = rows[0];
+  $('fva-kpis').innerHTML =
+    `<div class="fba-kpi"><div class="v">${rows.length}</div><div class="l">active exchanges</div></div>
+     <div class="fba-kpi"><div class="v" style="color:var(--primary)">${variable.length}</div><div class="l">variable (flexible)</div></div>
+     <div class="fba-kpi"><div class="v">${fixed.length}</div><div class="l">fixed (determined)</div></div>
+     <div class="fba-kpi"><div class="v" style="color:var(--warn)">${reversible.length}</div><div class="l">reversible</div></div>`;
+  $('fva-interp').innerHTML =
+    `<b>Interpretation.</b> Holding growth at ≥ ${res.fraction}× the optimum, ${rows.length} exchanges carry flux. `
+    + `<b>${fixed.length}</b> ${fixed.length === 1 ? 'is' : 'are'} <b>fully determined</b> (min = max — the objective leaves no choice there), while <b style="color:var(--primary)">${variable.length}</b> ${variable.length === 1 ? 'is' : 'are'} <b>variable</b>: the same optimal growth is reachable with a range of fluxes, i.e. the network has alternate optima / redundancy at those exchanges. `
+    + (widest ? `The most flexible is <b>${esc(bio(widest.id))}</b> (${fmt(widest.min)} … ${fmt(widest.max)}, span ${fmt(widest.span)}). ` : '')
+    + (reversible.length ? `${reversible.length} exchange${reversible.length > 1 ? 's' : ''} can run in <b style="color:var(--warn)">either direction</b> (uptake or secretion) without changing growth. ` : '')
+    + `Wide spans flag where the model is under-constrained or where a strain keeps redundant routes; lower the growth fraction to see the range widen as the objective relaxes.`;
   window.Plotly.newPlot('fva-plot', [{
     type: 'scatter', mode: 'markers', x: top.map(r => r.min), y: top.map(bioName), name: 'min',
     marker: { color: '#2c6fbb', size: 8, symbol: 'line-ns-open' }, hovertemplate: '%{y}<br>min %{x:.3f}<extra></extra>'
@@ -757,6 +774,16 @@ async function runEnvelope() {
       annotations: [{ x: peak.product, y: peak.growthMax, text: `peak ${fmt(peak.growthMax, 3)} @ ${fmt(peak.product, 1)}`, showarrow: true, arrowhead: 2, ax: 0, ay: -30, font: { size: 10 } }],
     }, { responsive: true, displaylogo: false });
     $('env-note').textContent = `The shaded region is the feasible biomass range at each production level. Max ${bio(product)} production is ${fmt(res.prodMax, 2)} mmol·gDW⁻¹·h⁻¹ (at zero growth).`;
+    // interpretation
+    const growthCoupled = res.points.some(p => p.product > 1e-6 && p.growthMin > 1e-6);
+    const half = peak.growthMax * 0.5;
+    const atHalf = res.points.filter(p => p.growthMax >= half).reduce((a, b) => b.product > a.product ? b : a, res.points[0]);
+    $('env-interp').innerHTML =
+      `<b>Interpretation.</b> This is the growth-vs-<b>${esc(bio(product))}</b> trade-off — the bioengineer's map. Maximum ${esc(bio(product))} secretion is <b>${fmt(res.prodMax, 2)}</b> mmol·gDW⁻¹·h⁻¹, but only at <b>zero growth</b> (all carbon diverted to product). At full growth (${fmt(peak.growthMax, 3)} h⁻¹) the cell makes ${fmt(peak.product, 2)}. `
+      + `The downward frontier means production and growth <b>compete</b> for carbon and energy — every extra unit of product costs biomass. A practical design target sits on the upper frontier where growth is still viable: at half-maximal growth (${fmt(half, 3)} h⁻¹) the model can still secrete ~<b>${fmt(atHalf.product, 2)}</b> mmol·gDW⁻¹·h⁻¹. `
+      + (growthCoupled
+        ? `Because the <b>lower</b> line rises above zero, production is <b style="color:var(--ok)">growth-coupled</b> — the cell cannot grow without making some ${esc(bio(product))}, which is the ideal for a stable, selection-robust overproducer.`
+        : `The lower line sits at zero, so production is <b>not obligatory</b> (growth-competing) — the strain will only overproduce under enforced flux, e.g. a knockout that couples the two (see Strain Design / FSEOF).`);
     setStatus('env-status', `Done in ${((performance.now() - t0) / 1000).toFixed(1)} s.`, 'ok');
   } catch (e) { setStatus('env-status', 'Error: ' + e.message, 'err'); console.error(e); prog('env-prog', 'env-prog-bar', null); }
   finally { $('env-run').disabled = false; }
@@ -789,6 +816,16 @@ async function runPP() {
     $('pp-results').style.display = 'block';
     window.Plotly.newPlot('pp-plot', [{ type: 'contour', z: res.Z, x: res.xs, y: res.ys, colorscale: 'Viridis', contours: { coloring: 'heatmap' }, colorbar: { title: 'growth h⁻¹', thickness: 12 }, hovertemplate: `${bio(xId)} %{x:.1f}<br>${bio(yId)} %{y:.1f}<br>growth %{z:.3f}<extra></extra>` }],
       { margin: { l: 60, r: 10, t: 15, b: 55 }, height: 480, xaxis: { title: `${bio(xId)} uptake capacity` }, yaxis: { title: `${bio(yId)} uptake capacity` }, font: { size: 11 } }, { responsive: true, displaylogo: false });
+    // interpretation
+    let zmax = -Infinity, bx = 0, by = 0;
+    for (let j = 0; j < res.Z.length; j++) for (let i = 0; i < res.Z[j].length; i++) if (res.Z[j][i] > zmax) { zmax = res.Z[j][i]; bx = res.xs[i]; by = res.ys[j]; }
+    const cornerX = bx >= res.xs[res.xs.length - 1] - 1e-9, cornerY = by >= res.ys[res.ys.length - 1] - 1e-9;
+    $('pp-interp').innerHTML =
+      `<b>Interpretation.</b> The surface is the growth landscape over the uptake capacities of <b>${esc(bio(xId))}</b> (x) and <b>${esc(bio(yId))}</b> (y). Peak growth is <b>${fmt(zmax, 3)}</b> h⁻¹ at ${esc(bio(xId))} ≈ ${fmt(bx, 1)}, ${esc(bio(yId))} ≈ ${fmt(by, 1)}. `
+      + ((cornerX && cornerY)
+        ? `The optimum sits at the top-right corner, so growth is <b>co-limited</b>: more of either substrate still helps — the cell is not yet saturated in this range.`
+        : `The optimum is reached before the grid edge, so beyond it growth <b>saturates</b> — adding more ${cornerX ? esc(bio(yId)) : esc(bio(xId))} no longer helps and an internal capacity (or the other substrate) becomes limiting.`)
+      + ` The lines where the surface changes slope are metabolic <b>phases</b> — each region uses a different optimal pathway set (classically, respiration gives way to fermentation as the oxygen axis drops).`;
     setStatus('pp-status', `Done — ${n * n} solves in ${((performance.now() - t0) / 1000).toFixed(1)} s.`, 'ok');
   } catch (e) { setStatus('pp-status', 'Error: ' + e.message, 'err'); console.error(e); prog('pp-prog', 'pp-prog-bar', null); }
   finally { $('pp-run').disabled = false; }
@@ -1229,6 +1266,20 @@ function renderSamp(res) {
     box: { visible: true }, meanline: { visible: true },
     line: { color: PALETTE[i % PALETTE.length] },
   })), plotly('', '', 'Flux (mmol gDW⁻¹ h⁻¹)'), PLOT_CFG);
+  // interpretation
+  const stats = active.map(id => {
+    const xs = res.samples.map(s => s[id]); const m = xs.reduce((a, b) => a + b, 0) / xs.length;
+    const sd = Math.sqrt(xs.reduce((a, b) => a + (b - m) * (b - m), 0) / xs.length);
+    return { id, m, sd, cv: Math.abs(m) > 1e-6 ? sd / Math.abs(m) : Infinity };
+  });
+  const spread = stats.filter(s => s.sd > 1e-6);
+  const widest = spread.slice().sort((a, b) => b.sd - a.sd)[0];
+  const tightest = spread.slice().sort((a, b) => a.sd - b.sd)[0];
+  if ($('samp-interp')) $('samp-interp').innerHTML =
+    `<b>Interpretation.</b> FBA returns one optimal flux vector, but the network usually admits <b>many</b> equally-optimal states. Sampling walks that solution space (growth held at ${(100 * res.fraction).toFixed(0)}%) to show the full <b>distribution</b> of each exchange flux. `
+    + (widest ? `<b>${esc(bio(widest.id))}</b> is the least determined (mean ${fmt(widest.m, 2)} ± ${fmt(widest.sd, 2)}) — the cell can run it over a wide range without any growth cost, so a single FBA value there is not a confident prediction. ` : '')
+    + (tightest ? `<b>${esc(bio(tightest.id))}</b> is the most constrained (± ${fmt(tightest.sd, 2)}) — nearly fixed across every sample, so it is a <b>robust</b> prediction. ` : '')
+    + `A wide or two-humped violin means flexibility or alternate pathway usage; a narrow one means the flux is essentially forced. Read the spread, not just the mean.`;
   $('samp-csv').onclick = () => {
     let c = res.track.join(',') + '\n';
     res.samples.forEach(s => c += res.track.map(id => s[id]).join(',') + '\n');
